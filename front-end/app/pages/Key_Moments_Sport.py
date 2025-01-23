@@ -10,6 +10,7 @@ PROJECT_ID = "videosearch-cloudspace"
 REGION = "us-central1"
 VIDEO_CLIPS = "key-moment-video-clips"
 
+
 # Initiatlize variables
 gcs_file = None
 gemini_output = None
@@ -17,6 +18,10 @@ gemini_output = None
 # Define storage client for file uploads
 storage_client = storage.Client(project=PROJECT_ID)
 st.set_page_config(layout="wide")
+
+st.sidebar.markdown(
+    "[GitHub Repo](https://github.com/ljogeiger/media_platform/blob/main/front-end/app/pages/Key_Moments_Sport.py)"
+)
 
 
 # Function to upload bytes object to GCS bucket
@@ -92,6 +97,21 @@ def generate():
     return response.text
 
 
+def hms_to_seconds(hms_str):
+    """Converts a string in HH:MM:SS.000 format to the number of seconds.
+
+  Args:
+    hms_str: The string representing the time in HH:MM:SS.000 format.
+
+  Returns:
+    The total number of seconds as an integer.
+  """
+    hours, minutes, seconds_ms = hms_str.split(":")
+    seconds, milliseconds = map(int, seconds_ms.split("."))
+    total_seconds = (int(hours) * 3600) + (int(minutes) * 60) + seconds
+    return total_seconds
+
+
 def list_files_in_bucket(bucket_name):
     bucket = storage_client.bucket(bucket_name)
     blobs = bucket.list_blobs()
@@ -100,18 +120,19 @@ def list_files_in_bucket(bucket_name):
 
 st.title("Extract Key Moments from Sport Clips")
 
-with st.expander("Upload Video"):
-    st.header("Upload Video File")
-    st.text(
-        "Upload a video file from your local machine to the video database")
+# Cannot use this on Cloud run due to 32 mib limit
+# with st.expander("Upload Video"):
+#     st.header("Upload Video File")
+#     st.text(
+#         "Upload a video file from your local machine to the video database")
 
-    uploaded_file = st.file_uploader("Choose a video...", type=["mp4"])
-    upload_file_start = st.button("Upload File")
+#     uploaded_file = st.file_uploader("Choose a video...", type=["mp4"])
+#     upload_file_start = st.button("Upload File")
 
-    if upload_file_start and uploaded_file:
-        upload_video_file(uploaded_file=uploaded_file, bucket_name=VIDEO_CLIPS)
+#     if upload_file_start and uploaded_file:
+#         upload_video_file(uploaded_file=uploaded_file, bucket_name=VIDEO_CLIPS)
 
-        print(f"Uploaded file name: {uploaded_file}")
+#         print(f"Uploaded file name: {uploaded_file}")
 
 st.header("Select File")
 # Get the list of files in the bucket
@@ -200,9 +221,9 @@ if gemini_output:
                 cols[col].header(
                     f"Title #{item+1}: **{result_list[item]['title']}**")
                 cols[col].markdown(f"Reason: {result_list[item]['reason']}")
-                cols[col].video(
-                    result_list[item]["signedURL"],
-                    start_time=f"0:{result_list[item]['start_sec']}.000")
+                cols[col].video(result_list[item]["signedURL"],
+                                start_time=hms_to_seconds(
+                                    f"0:{result_list[item]['start_sec']}.000"))
                 cols[col].markdown(
                     f"Social Media Text: {result_list[item]['social_media_text']}"
                 )

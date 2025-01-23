@@ -16,12 +16,12 @@ import google.auth.transport.requests
 import math
 
 storage_client = storage.Client(project="videosearch-cloudspace")
-storage_client_2 = storage.Client(project="geminipro-15") # need to upload to different project so Gemini 1.5 can access objects
 
 # change these
-PROJECT_NAME="videosearch-cloudspace"
-REGION="us-central1"
-INDEX_ID="7673540028760326144"
+PROJECT_NAME = "videosearch-cloudspace"
+REGION = "us-central1"
+INDEX_ID = "7673540028760326144"
+
 
 def getToken():
     creds, project = google.auth.default()
@@ -29,27 +29,27 @@ def getToken():
     creds.refresh(auth_req)
     return creds.token
 
+
 def upsertDataPoint(datapoint_id, datapoint_content):
 
     type_datapointcontent = type(datapoint_content)
     type_datapointid = type(datapoint_id)
 
     print(f"datapoint id: {datapoint_id}, type: {type_datapointid}")
-    print(f"datapoint content: {datapoint_content[0]}, type: {type_datapointcontent}")
+    print(
+        f"datapoint content: {datapoint_content[0]}, type: {type_datapointcontent}"
+    )
 
     token = getToken()
 
-    response = requests.post(f"https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_NAME}/locations/{REGION}/indexes/{INDEX_ID}:upsertDatapoints",
-        headers = {
-            "Authorization": f"Bearer {token}"
-        },
-        json = {
-            "datapoints": [
-                {
-                    "datapointId": datapoint_id,
-                    "featureVector": datapoint_content
-                }
-            ]
+    response = requests.post(
+        f"https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_NAME}/locations/{REGION}/indexes/{INDEX_ID}:upsertDatapoints",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "datapoints": [{
+                "datapointId": datapoint_id,
+                "featureVector": datapoint_content
+            }]
         })
 
     print(response.json())
@@ -59,12 +59,12 @@ def upsertDataPoint(datapoint_id, datapoint_content):
     else:
         return "error"
 
-def split_video_by_duration(
-        video,
-        seconds_per_part = 120,
-        output_filepath_template = "/tmp/part-%d.mp4"):
 
-     # Calculate the duration of the video in seconds
+def split_video_by_duration(video,
+                            seconds_per_part=120,
+                            output_filepath_template="/tmp/part-%d.mp4"):
+
+    # Calculate the duration of the video in seconds
     duration = int(video.duration)
 
     # print(f"Video Length: {duration}")
@@ -89,11 +89,12 @@ def split_video_by_duration(
         output_filepath = output_filepath_template % part
         current_part.write_videofile(
             output_filepath,
-            audio = True # set this to True if you have audio files
-            )
+            audio=True  # set this to True if you have audio files
+        )
         output_filepaths.append(output_filepath)
 
     return output_filepaths
+
 
 # Triggered by a change in a storage bucket
 @functions_framework.cloud_event
@@ -115,10 +116,11 @@ def main(cloud_event: CloudEvent):
     parts_bucket_name = "videosearch_video_source_parts"
     output_bucket_name = "videosearch_embeddings"
     input_video_name = request["name"]
-    stripped_input_video_name = input_video_name.replace(".mp4","")
+    stripped_input_video_name = input_video_name.replace(".mp4", "")
 
-    with open(f'{destination_file}','wb') as file_obj:
-        storage_client.download_blob_to_file(f'gs://{input_bucket_name}/{input_video_name}',file_obj)
+    with open(f'{destination_file}', 'wb') as file_obj:
+        storage_client.download_blob_to_file(
+            f'gs://{input_bucket_name}/{input_video_name}', file_obj)
 
     vid = VideoFileClip(destination_file)
 
@@ -131,91 +133,67 @@ def main(cloud_event: CloudEvent):
         bucket=storage_client.bucket(parts_bucket_name),
         filenames=split_video_paths,
         source_directory="",
-        blob_name_prefix=stripped_input_video_name
-    )
-
-    results_2 = transfer_manager.upload_many_from_filenames(
-        bucket=storage_client_2.bucket("geminipro-15-video-source-parts"),
-        filenames=split_video_paths,
-        source_directory="",
-        blob_name_prefix=stripped_input_video_name
-    )
+        blob_name_prefix=stripped_input_video_name)
 
     for name, result in zip(split_video_paths, results):
         # The results list is either `None` or an exception for each filename in
         # the input list, in order.
 
         if isinstance(result, Exception):
-            print("Failed to upload {} due to exception: {}".format(name, result))
+            print("Failed to upload {} due to exception: {}".format(
+                name, result))
         else:
             print("Uploaded {} to {}.".format(name, parts_bucket_name))
-
-    for name, result in zip(split_video_paths, results_2):
-        # The results list is either `None` or an exception for each filename in
-        # the input list, in order.
-
-        if isinstance(result, Exception):
-            print("Failed to upload {} due to exception: {}".format(name, result))
-        else:
-            print("Uploaded {} to {}.".format(name, "geminipro-15-video-source-parts"))
 
     token = getToken()
 
     # get embeddings
     for part in split_video_paths:
-      name = f"{stripped_input_video_name}{part}"
-      print(f"Generating embeddings for part: gs://{name}")
+        name = f"{stripped_input_video_name}{part}"
+        print(f"Generating embeddings for part: gs://{name}")
 
-      response = requests.post(f"https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_NAME}/locations/{REGION}/publishers/google/models/multimodalembedding@001:predict",
-          headers = {
-              "Authorization": f"Bearer {token}"
-          },
-          json = {
-              "instances": [
-                  {"video": {
-                      "gcsUri": f"gs://{parts_bucket_name}/{name}",
-                      "videoSegmentConfig": {
-                          "intervalSec": 5
+        response = requests.post(
+            f"https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_NAME}/locations/{REGION}/publishers/google/models/multimodalembedding@001:predict",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "instances": [{
+                    "video": {
+                        "gcsUri": f"gs://{parts_bucket_name}/{name}",
+                        "videoSegmentConfig": {
+                            "intervalSec": 5
                         }
-                      }
-                  }
-              ]
-          })
+                    }
+                }]
+            })
 
-      print(response.json())
+        print(response.json())
 
+        embeddings_list = response.json()["predictions"][0]['videoEmbeddings']
 
-      embeddings_list = response.json()["predictions"][0]['videoEmbeddings']
+        # TODO: embeddings should be stored by timestamps
+        count = 0
+        for embedding_object in embeddings_list:
+            count += 1
+            embedding = embedding_object['embedding']
+            id = f"{name}_{count}"
 
-      # TODO: embeddings should be stored by timestamps
-      count = 0
-      for embedding_object in embeddings_list:
-        count+=1
-        embedding = embedding_object['embedding']
-        id = f"{name}_{count}"
+            json_object = {"id": f"{id}", "embedding": embedding}
 
-        json_object = {
-            "id": f"{id}",
-            "embedding": embedding
-        }
+            # NOTE: doesn't not check for repeated uploads of same image. Would need to include some logic in order to avoid overwriting already uploaded images
+            # Vector Search does check for duplicates before upserting so it wouldn't affect the index performance wise. Although you would likely get charged for the bytes transfered.
 
-        # NOTE: doesn't not check for repeated uploads of same image. Would need to include some logic in order to avoid overwriting already uploaded images
-        # Vector Search does check for duplicates before upserting so it wouldn't affect the index performance wise. Although you would likely get charged for the bytes transfered.
+            output_bucket = storage_client.bucket(output_bucket_name)
 
-        output_bucket = storage_client.bucket(output_bucket_name)
+            new_blob = output_bucket.blob(f"{id}.json")
+            new_blob.upload_from_string(data=json.dumps(json_object),
+                                        content_type='application/json')
 
-        new_blob = output_bucket.blob(f"{id}.json")
-        new_blob.upload_from_string(
-            data=json.dumps(json_object),
-            content_type='application/json'
-        )
+            upsert_result = upsertDataPoint(id, embedding)
+            print(f"Upsert Result: {upsert_result}")
 
-        upsert_result = upsertDataPoint(id, embedding)
-        print(f"Upsert Result: {upsert_result}")
-
-        if upsert_result == "success":
-            print(f"{id}.json complete")
-        else:
-            print(f"{id}.json unsuccessful")
+            if upsert_result == "success":
+                print(f"{id}.json complete")
+            else:
+                print(f"{id}.json unsuccessful")
 
     return

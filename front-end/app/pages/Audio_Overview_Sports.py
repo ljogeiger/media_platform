@@ -14,6 +14,10 @@ PROJECT_ID = "videosearch-cloudspace"
 AUDIO_BUCKET = "audio_overview_sports"
 VIDEO_CLIPS = "key-moment-video-clips"
 
+st.sidebar.markdown(
+    "[GitHub Repo](https://github.com/ljogeiger/media_platform/blob/main/front-end/app/pages/Audio_Overview_Sports.py)"
+)
+
 storage_client = storage.Client(project=PROJECT_ID)
 vertexai.init(project=PROJECT_ID, location="us-central1")
 
